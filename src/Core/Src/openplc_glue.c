@@ -125,6 +125,13 @@ volatile uint32_t plc_ciclos_excedidos = 0;
 volatile uint32_t plc_periodo_ms = 1;
 
 static unsigned long tick_iec = 0;
+
+/* Se ejecuta repetidamente mientras se espera el proximo ciclo.
+ * Definila en tu codigo (por ejemplo en main.c) para aprovechar ese tiempo,
+ * como hace main.c con mb_procesar(). */
+__attribute__((weak)) void plc_tarea_en_espera(void)
+{
+}
 static uint32_t proximo_ciclo = 0;
 
 void plc_openplc_init(void)
@@ -152,6 +159,7 @@ void plc_openplc_wait_cycle(void)
         proximo_ciclo = ahora;
     } else {
         while ((int32_t)(HAL_GetTick() - proximo_ciclo) < 0) {
+            plc_tarea_en_espera();
         }
     }
     proximo_ciclo += plc_periodo_ms;

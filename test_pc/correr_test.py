@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-Compila y corre en la PC el test del programa de ejemplo, sin hardware.
+Compila y corre en la PC los tests, sin hardware.
 Requiere gcc (en Windows: MinGW-w64 o MSYS2).
 
     python test_pc/correr_test.py
 
-Valido para programas/ejemplo.st. Si cambias el programa generado,
-adapta los chequeos de test_ejemplo.c.
+- test_ejemplo: programa de ejemplo (programas/ejemplo.st) + openplc_glue.c.
+  Valido para el ejemplo; si cambias el programa generado, adapta los chequeos.
+- test_modbus: maestro Modbus RTU (envio, CRC, respuestas, errores y timeout).
 """
 import shutil
 import subprocess
@@ -16,23 +17,38 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 INC = RAIZ / "src" / "Core" / "Inc"
+SRC = RAIZ / "src" / "Core" / "Src"
+GEN = RAIZ / "src" / "OpenPLC" / "generated"
+LIB = RAIZ / "src" / "OpenPLC" / "lib"
+NO_COPIAR = {"main.h", "stm32f1xx_hal_conf.h", "stm32f1xx_it.h"}
 
+TESTS = {
+    "test_ejemplo": [SRC / "openplc_glue.c", GEN / "Config0.c", GEN / "Res0.c"],
+    "test_modbus": [SRC / "mbus_funcs.c", SRC / "mbus_parser.c", SRC / "modbus_crc.c"],
+}
+
+fallas = 0
 with tempfile.TemporaryDirectory() as tmp:
     fake = Path(tmp) / "fake"
     shutil.copytree(RAIZ / "test_pc" / "fake", fake)
-    # induSPI.h incluye "main.h": se copia junto a los headers falsos del HAL
-    for h in ("induSPI.h", "openplc_glue.h"):
-        shutil.copy(INC / h, fake / h)
-    exe = Path(tmp) / "test_ejemplo"
-    gen = RAIZ / "src" / "OpenPLC" / "generated"
-    cmd = [
-        "gcc", "-I", str(fake),
-        "-I", str(RAIZ / "src" / "OpenPLC" / "lib"), "-I", str(gen),
-        str(RAIZ / "test_pc" / "test_ejemplo.c"),
-        str(RAIZ / "src" / "Core" / "Src" / "openplc_glue.c"),
-        str(gen / "Config0.c"), str(gen / "Res0.c"),
-        "-lm", "-o", str(exe),
-    ]
-    if subprocess.run(cmd).returncode != 0:
-        sys.exit("Fallo la compilacion del test.")
-    sys.exit(subprocess.run([str(exe)]).returncode)
+    # Los headers del proyecto incluyen "main.h": se copian junto al HAL falso
+    for h in INC.glob("*.h"):
+        if h.name not in NO_COPIAR:
+            shutil.copy(h, fake / h.name)
+
+    for nombre, fuentes in TESTS.items():
+        print(f"===== {nombre} =====")
+        exe = Path(tmp) / nombre
+        cmd = ["gcc", "-I", str(fake), "-I", str(LIB), "-I", str(GEN),
+               str(RAIZ / "test_pc" / f"{nombre}.c"), *map(str, fuentes),
+               "-lm", "-o", str(exe)]
+        if subprocess.run(cmd).returncode != 0:
+            print("Fallo la compilacion del test.")
+            fallas += 1
+            continue
+        if subprocess.run([str(exe)]).returncode != 0:
+            fallas += 1
+        print()
+
+print("RESULTADO:", "HAY FALLAS" if fallas else "TODOS LOS TESTS OK")
+sys.exit(1 if fallas else 0)

@@ -1,237 +1,284 @@
-#include "stdio.h"
+/*
+ * mbus_funcs.c - Maestro Modbus RTU por RS-485 (USART3).
+ *
+ * Cada peticion: arma la trama + CRC, la transmite con TX_EN en alto,
+ * baja TX_EN apenas termina el ultimo bit y arranca la recepcion por
+ * interrupcion hasta detectar la linea inactiva (fin de trama).
+ * mb_procesar() valida y guarda la respuesta o detecta el timeout.
+ */
 
-
-/* Private includes ----------------------------------------------------------*/
-/* USER CODE BEGIN Includes */
-#include "modbus_crc.h"
 #include "mbus_funcs.h"
-/* USER CODE END Includes */
+#include "modbus_crc.h"
 
-/* Private typedef -----------------------------------------------------------*/
-/* USER CODE BEGIN PTD */
+uint8_t RxData[MB_MAX_TRAMA];
+uint8_t TxData[MB_MAX_TRAMA];
+uint8_t Data[MB_MAX_TRAMA];
+volatile uint8_t uart_rx_flag = 0;
 
-/* USER CODE END PTD */
+mb_respuesta_t    mbRespuesta;   /* arranca en cero: estado = MB_SIN_PETICION */
+mb_estadisticas_t mbEstadisticas;
+uint32_t          mb_timeout_ms = 100;
 
-/* Private define ------------------------------------------------------------*/
-/* USER CODE BEGIN PD */
-/* USER CODE END PD */
+static mb_peticion_t     pet_actual;
+static volatile bool     esperando = false;
+static volatile bool     rx_listo = false;
+static volatile bool     rx_error = false;
+static volatile uint16_t rx_largo = 0;
+static uint32_t          inicio_ms = 0;
+static uint32_t          fin_ms = 0;
+static mb_callback_t     callback = 0;
 
-/* Private macro -------------------------------------------------------------*/
-/* USER CODE BEGIN PM */
+/* ------------------------------------------------------------------------ */
 
-/* USER CODE END PM */
-
-/* Private variables ---------------------------------------------------------*/
-uint8_t RxData[256];
-uint8_t TxData[256];
-uint8_t bufCompleto[128];
-volatile uint8_t uart_rx_flag;
-uint8_t Data[256];
-
-
-/* USER CODE BEGIN PV */
-
-/* USER CODE END PV */
-
-/* Private function prototypes -----------------------------------------------*/
-//void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+bool sendData(uint8_t *data, uint16_t size)
 {
-    if (huart->Instance == USART3) {
-      memcpy(Data, RxData, 256);
-      HAL_UART_Receive_IT(&huart3, RxData, 9);
-    }
-   
+    /* Tiempo de transmision: 10 bits por byte + margen */
+    uint32_t baud = huart3.Init.BaudRate ? huart3.Init.BaudRate : 9600;
+    uint32_t timeout = (uint32_t)size * 10U * 1000U / baud + 5U;
+
+    HAL_GPIO_WritePin(TX_EN_GPIO_Port, TX_EN_Pin, GPIO_PIN_SET);
+    /* HAL_UART_Transmit vuelve cuando se envio el ultimo bit (flag TC) */
+    HAL_StatusTypeDef st = HAL_UART_Transmit(&huart3, data, size, timeout);
+    HAL_GPIO_WritePin(TX_EN_GPIO_Port, TX_EN_Pin, GPIO_PIN_RESET);
+
+    return st == HAL_OK;
 }
+
+static void finalizar(mb_estado_t estado)
+{
+    esperando = false;
+    fin_ms = HAL_GetTick();
+
+    if (estado != MB_OK && estado != MB_ERR_CRC && estado != MB_ERR_EXCEPCION &&
+        estado != MB_ERR_TRAMA) {
+        /* No hubo trama valida para interpretar: se completa a mano */
+        mbRespuesta.esclavo     = pet_actual.esclavo;
+        mbRespuesta.funcion     = pet_actual.funcion;
+        mbRespuesta.direccion   = pet_actual.direccion;
+        mbRespuesta.cantidad    = pet_actual.cantidad;
+        mbRespuesta.excepcion   = 0;
+        mbRespuesta.largo_trama = 0;
+    }
+    mbRespuesta.estado   = estado;
+    mbRespuesta.tiempo_ms = fin_ms;
+
+    switch (estado) {
+    case MB_OK:            mbEstadisticas.ok++;            break;
+    case MB_ERR_TIMEOUT:   mbEstadisticas.timeouts++;      break;
+    case MB_ERR_CRC:       mbEstadisticas.errores_crc++;   break;
+    case MB_ERR_EXCEPCION: mbEstadisticas.excepciones++;   break;
+    case MB_ERR_TRAMA:     mbEstadisticas.errores_trama++; break;
+    case MB_ERR_TX:        mbEstadisticas.errores_tx++;    break;
+    default: break;
+    }
+
+    if (callback)
+        callback(&mbRespuesta);
+}
+
+/* Agrega el CRC, envia y deja la recepcion armada */
+static mb_estado_t iniciar_peticion(const mb_peticion_t *pet, uint16_t largo)
+{
+    if (esperando)
+        return MB_ERR_OCUPADO;
+
+    /* Silencio entre tramas: al menos ~1 ms desde la respuesta anterior */
+    while ((HAL_GetTick() - fin_ms) < 2U) {
+    }
+
+    uint16_t crc = crc16(TxData, largo);
+    TxData[largo]     = (uint8_t)(crc & 0xFF);         /* CRC bajo */
+    TxData[largo + 1] = (uint8_t)((crc >> 8) & 0xFF);  /* CRC alto */
+    largo += 2;
+
+    pet_actual = *pet;
+    mbEstadisticas.peticiones++;
+
+    HAL_UART_AbortReceive(&huart3);
+    rx_listo = false;
+    rx_error = false;
+    rx_largo = 0;
+
+    if (!sendData(TxData, largo)) {
+        finalizar(MB_ERR_TX);
+        return MB_ERR_TX;
+    }
+
+    /* Broadcast (esclavo 0): no hay respuesta */
+    if (pet->esclavo == 0) {
+        finalizar(MB_OK);
+        return MB_OK;
+    }
+
+    esperando = true;
+    inicio_ms = HAL_GetTick();
+    mbRespuesta.estado = MB_PENDIENTE;
+
+    if (HAL_UARTEx_ReceiveToIdle_IT(&huart3, RxData, sizeof(RxData)) != HAL_OK) {
+        finalizar(MB_ERR_TX);
+        return MB_ERR_TX;
+    }
+    return MB_PENDIENTE;
+}
+
+static void cabecera(uint8_t esclavo, uint8_t funcion, uint16_t pos, uint16_t n)
+{
+    TxData[0] = esclavo;
+    TxData[1] = funcion;
+    TxData[2] = (uint8_t)(pos >> 8);
+    TxData[3] = (uint8_t)(pos & 0xFF);
+    TxData[4] = (uint8_t)(n >> 8);
+    TxData[5] = (uint8_t)(n & 0xFF);
+}
+
+static mb_estado_t lectura(uint16_t esclavo, uint8_t funcion, uint16_t pos,
+                           uint16_t cantidad, uint16_t maximo)
+{
+    if (esclavo == 0 || esclavo > 247 || cantidad == 0 || cantidad > maximo)
+        return MB_ERR_PARAM;
+    mb_peticion_t p = { (uint8_t)esclavo, funcion, pos, cantidad, 0 };
+    cabecera((uint8_t)esclavo, funcion, pos, cantidad);
+    return iniciar_peticion(&p, 6);
+}
+
+/* ---- Peticiones --------------------------------------------------------- */
+
+mb_estado_t readCoils(uint16_t slAddress, uint16_t pos, uint16_t numCoils)
+{
+    return lectura(slAddress, MB_FC_LEER_COILS, pos, numCoils, MB_MAX_BITS);
+}
+
+mb_estado_t readInputContacts(uint16_t slAddress, uint16_t pos, uint16_t numContacts)
+{
+    return lectura(slAddress, MB_FC_LEER_ENTRADAS, pos, numContacts, MB_MAX_BITS);
+}
+
+mb_estado_t readHoldingRegisters(uint16_t slAddress, uint16_t pos, uint16_t numRegisters)
+{
+    return lectura(slAddress, MB_FC_LEER_HOLDING, pos, numRegisters, MB_MAX_REGISTROS);
+}
+
+mb_estado_t readAnalogInputs(uint16_t slAddress, uint16_t pos, uint16_t numRegisters)
+{
+    return lectura(slAddress, MB_FC_LEER_INPUT_REGS, pos, numRegisters, MB_MAX_REGISTROS);
+}
+
+mb_estado_t writeSingleCoil(uint16_t slAddress, uint16_t pos, uint16_t value)
+{
+    if (slAddress > 247)
+        return MB_ERR_PARAM;
+    uint16_t v = value ? 0xFF00 : 0x0000;   /* valores que define el estandar */
+    mb_peticion_t p = { (uint8_t)slAddress, MB_FC_ESCRIBIR_COIL, pos, 1, v };
+    cabecera((uint8_t)slAddress, MB_FC_ESCRIBIR_COIL, pos, v);
+    return iniciar_peticion(&p, 6);
+}
+
+mb_estado_t writeSingleRegister(uint16_t slAddress, uint16_t pos, uint16_t value)
+{
+    if (slAddress > 247)
+        return MB_ERR_PARAM;
+    mb_peticion_t p = { (uint8_t)slAddress, MB_FC_ESCRIBIR_REGISTRO, pos, 1, value };
+    cabecera((uint8_t)slAddress, MB_FC_ESCRIBIR_REGISTRO, pos, value);
+    return iniciar_peticion(&p, 6);
+}
+
+mb_estado_t writeMultipleCoils(uint16_t slAddress, uint16_t pos, uint8_t *values, uint16_t numCoils)
+{
+    if (slAddress > 247 || values == 0 || numCoils == 0 || numCoils > 1968)
+        return MB_ERR_PARAM;
+    if (esperando)
+        return MB_ERR_OCUPADO;
+
+    uint8_t bytes = (uint8_t)((numCoils + 7) / 8);
+    cabecera((uint8_t)slAddress, MB_FC_ESCRIBIR_COILS, pos, numCoils);
+    TxData[6] = bytes;
+    memset(&TxData[7], 0, bytes);
+    for (uint16_t i = 0; i < numCoils; i++) {
+        if (values[i])
+            TxData[7 + i / 8] |= (uint8_t)(1U << (i % 8));
+    }
+    mb_peticion_t p = { (uint8_t)slAddress, MB_FC_ESCRIBIR_COILS, pos, numCoils, 0 };
+    return iniciar_peticion(&p, (uint16_t)(7 + bytes));
+}
+
+mb_estado_t writeMultipleRegisters(uint16_t slAddress, uint16_t pos, uint16_t *values, uint16_t numRegisters)
+{
+    if (slAddress > 247 || values == 0 || numRegisters == 0 || numRegisters > 123)
+        return MB_ERR_PARAM;
+    if (esperando)
+        return MB_ERR_OCUPADO;
+
+    cabecera((uint8_t)slAddress, MB_FC_ESCRIBIR_REGISTROS, pos, numRegisters);
+    TxData[6] = (uint8_t)(numRegisters * 2);
+    for (uint16_t i = 0; i < numRegisters; i++) {
+        TxData[7 + i * 2] = (uint8_t)(values[i] >> 8);
+        TxData[8 + i * 2] = (uint8_t)(values[i] & 0xFF);
+    }
+    mb_peticion_t p = { (uint8_t)slAddress, MB_FC_ESCRIBIR_REGISTROS, pos, numRegisters, 0 };
+    return iniciar_peticion(&p, (uint16_t)(7 + numRegisters * 2));
+}
+
+/* ---- Gestion ------------------------------------------------------------ */
+
+void mb_procesar(void)
+{
+    if (!esperando)
+        return;
+
+    if (rx_listo) {
+        uint16_t largo = rx_largo;
+        mb_estado_t e = mb_interpretar(&pet_actual, RxData, largo, &mbRespuesta);
+        memcpy(Data, RxData, largo);
+        uart_rx_flag = 1;
+        finalizar(e);
+    } else if (rx_error) {
+        HAL_UART_AbortReceive(&huart3);
+        finalizar(MB_ERR_TRAMA);
+    } else if ((HAL_GetTick() - inicio_ms) >= mb_timeout_ms) {
+        HAL_UART_AbortReceive(&huart3);
+        finalizar(MB_ERR_TIMEOUT);
+    }
+}
+
+bool mb_ocupado(void)
+{
+    return esperando;
+}
+
+mb_estado_t mb_estado(void)
+{
+    return mbRespuesta.estado;
+}
+
+mb_estado_t mb_esperar(void)
+{
+    while (esperando)
+        mb_procesar();
+    return mbRespuesta.estado;
+}
+
+void mb_set_callback(mb_callback_t cb)
+{
+    callback = cb;
+}
+
+/* ---- Callbacks del HAL (contexto de interrupcion: solo marcar flags) ---- */
+
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
-    if (huart->Instance == USART3)
-    {
-        memcpy(Data, RxData, Size);
+    if (huart->Instance != USART3 || !esperando)
+        return;
+    if (Size == 0) {
+        /* Linea inactiva sin datos: se vuelve a escuchar */
+        HAL_UARTEx_ReceiveToIdle_IT(&huart3, RxData, sizeof(RxData));
+        return;
     }
+    rx_largo = Size;
+    rx_listo = true;
 }
 
-
-
-void sendData (uint8_t *data, uint16_t size)
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
-	HAL_GPIO_WritePin(TX_EN_GPIO_Port, TX_EN_Pin, GPIO_PIN_SET);
-  
-  //timeout de 5ms
-	HAL_UART_Transmit(&huart3, data, size, 10);
-
-	HAL_GPIO_WritePin(TX_EN_GPIO_Port,TX_EN_Pin , GPIO_PIN_RESET);
-
-  HAL_Delay(5);
-}
-
-
-void readCoils(uint16_t slAddress, uint16_t pos, uint16_t numCoils)
-{
-  TxData[0] = slAddress;  
-  TxData[1] = 0x01;  // Function code for Read Coils
-
-  TxData[2] = (uint8_t)(pos>>8&0xFF);
-  TxData[3] = (uint8_t)(pos&0xFF);
-
-  TxData[4] = (uint8_t)(numCoils>>8&0xFF);  // Number of coils to read HIGH
-  TxData[5] = (uint8_t)(numCoils&0xFF);  // Number of coils to read LOW
-
-  uint16_t crc = crc16(TxData, 6);
-  TxData[6] = (uint8_t)(crc&0xFF);   // CRC LOW
-  TxData[7] = (uint8_t)((crc>>8)&0xFF);  // CRC HIGH
-
-  sendData(TxData, 8);
-
-  HAL_UARTEx_ReceiveToIdle_IT(&huart3, RxData, 5+(numCoils+7)/8);
-}
-
-void writeSingleCoil(uint16_t slAddress, uint16_t pos, uint16_t value)
-{
-  TxData[0] = slAddress;  
-  TxData[1] = 0x05;  // Function code for Write Single Coil
-
-  TxData[2] = (uint8_t)(pos>>8&0xFF);
-  TxData[3] = (uint8_t)(pos&0xFF);
-
-  TxData[4] = (value == 0) ? 0x00 : 0xFF;  // Coil value LOW
-  TxData[5] = 0x00;  // Coil value HIGH
-
-  uint16_t crc = crc16(TxData, 6);
-  TxData[6] = (uint8_t)(crc&0xFF);   // CRC LOW
-  TxData[7] = (uint8_t)((crc>>8)&0xFF);  // CRC HIGH
-
-  sendData(TxData, 8);
-}
-
-void writeMultipleCoils(uint16_t slAddress, uint16_t pos, uint8_t *values, uint16_t numCoils)
-{
-  TxData[0] = slAddress;  
-  TxData[1] = 0x0F;  // Function code for Write Multiple Coils
-
-  TxData[2] = (uint8_t)(pos>>8&0xFF);
-  TxData[3] = (uint8_t)(pos&0xFF);
-
-  TxData[4] = (uint8_t)(numCoils>>8&0xFF);  // Number of coils to write HIGH
-  TxData[5] = (uint8_t)(numCoils&0xFF);  // Number of coils to write LOW
-
-  TxData[6] = (numCoils + 7) / 8;  // Number of bytes needed to represent the coils
-
-  uint8_t byteCount = (numCoils + 7) / 8; // Number of bytes needed to represent the coils
-
-  memset(&TxData[7], 0, byteCount); // Clear the coil data bytes
-
-  for (int i = 0; i < numCoils; i++) {
-    TxData[7 + i/8] |= (values[i] ? (1 << (i % 8)) : 0);  // Set the appropriate bit for each coil
-  }
-
-  uint16_t crc = crc16(TxData, 7 + (numCoils + 7) / 8);
-  TxData[7 + (numCoils + 7) / 8] = (uint8_t)(crc&0xFF);   // CRC LOW
-  TxData[8 + (numCoils + 7) / 8] = (uint8_t)((crc>>8)&0xFF);  // CRC HIGH
-
-  sendData(TxData, 9 + (numCoils + 7) / 8);
-}
-
-void readInputContacts(uint16_t slAddress, uint16_t pos, uint16_t numContacts)
-{
-  TxData[0] = slAddress;  
-  TxData[1] = 0x02;  // Function code for Read Input Contacts
-
-  TxData[2] = (uint8_t)(pos>>8&0xFF);
-  TxData[3] = (uint8_t)(pos&0xFF);
-
-  TxData[4] = (uint8_t)(numContacts>>8&0xFF);  // Number of contacts to read HIGH
-  TxData[5] = (uint8_t)(numContacts&0xFF);  // Number of contacts to read LOW
-
-  uint16_t crc = crc16(TxData, 6);
-  TxData[6] = (uint8_t)(crc&0xFF);   // CRC LOW
-  TxData[7] = (uint8_t)((crc>>8)&0xFF);  // CRC HIGH
-
-  sendData(TxData, 8);
-  HAL_UARTEx_ReceiveToIdle_IT(&huart3, RxData, 5+(numContacts+7)/8);
-}
-
-void readHoldingRegisters(uint16_t slAddress, uint16_t pos, uint16_t numRegisters)
-{
-  TxData[0] = slAddress;  
-  TxData[1] = 0x03;  // Function code for Read Holding Registers
-
-  TxData[2] = (uint8_t)(pos>>8&0xFF);
-  TxData[3] = (uint8_t)(pos&0xFF);
-
-  TxData[4] = (uint8_t)(numRegisters>>8&0xFF);  // Number of registers to read HIGH
-  TxData[5] = (uint8_t)(numRegisters&0xFF);  // Number of registers to read LOW
-
-  uint16_t crc = crc16(TxData, 6);
-  TxData[6] = (uint8_t)(crc&0xFF);   // CRC LOW
-  TxData[7] = (uint8_t)((crc>>8)&0xFF);  // CRC HIGH
-
-  sendData(TxData, 8);
-  // HAL_UART_Receive_IT(&huart3, RxData, 5 + numRegisters * 2);
-  HAL_StatusTypeDef status = HAL_UART_Receive_IT(&huart3, RxData, 5 + numRegisters * 2);
-  if (status != HAL_OK) {
-    printf("Error al iniciar la recepción: %d\r\n", status);
-  }
-}
-
-void writeSingleRegister(uint16_t slAddress, uint16_t pos, uint16_t value)
-{
-  TxData[0] = slAddress;  
-  TxData[1] = 0x06;  // Function code for Write Single Register
-
-  TxData[2] = (uint8_t)(pos>>8&0xFF);
-  TxData[3] = (uint8_t)(pos&0xFF);
-
-  TxData[4] = (uint8_t)(value>>8&0xFF);
-  TxData[5] = (uint8_t)(value&0xFF);
-
-  uint16_t crc = crc16(TxData, 6);
-  TxData[6] = (uint8_t)(crc&0xFF);   // CRC LOW
-  TxData[7] = (uint8_t)((crc>>8)&0xFF);  // CRC HIGH
-
-  sendData(TxData, 8);
-}
-
-void writeMultipleRegisters(uint16_t slAddress, uint16_t pos, uint16_t *values, uint16_t numRegisters)
-{
-  TxData[0] = slAddress;  
-  TxData[1] = 0x10;  // Function code for Write Multiple Registers
-
-  TxData[2] = (uint8_t)(pos>>8&0xFF);
-  TxData[3] = (uint8_t)(pos&0xFF);
-
-  TxData[4] = (uint8_t)((numRegisters>>8)&0xFF);
-  TxData[5] = (uint8_t)(numRegisters&0xFF);
-
-  TxData[6] = numRegisters * 2;
-
-  for (int i = 0; i < numRegisters; i++) {
-    TxData[7 + i*2] = (uint8_t)((values[i]>>8)&0xFF);   // Register value HIGH
-    TxData[8 + i*2] = (uint8_t)(values[i]&0xFF);   // Register value LOW
-  }
-
-  uint16_t crc = crc16(TxData, 7 + numRegisters*2);
-  TxData[7 + numRegisters*2] = (uint8_t)(crc&0xFF);   // CRC LOW
-  TxData[8 + numRegisters*2] = (uint8_t)((crc>>8)&0xFF);  // CRC HIGH
-
-  sendData(TxData, 9 + numRegisters*2);
-}
-
-void readAnalogInputs(uint16_t slAddress, uint16_t pos, uint16_t numRegisters)
-{
-  TxData[0] = slAddress;  
-  TxData[1] = 0x04;  // Function code for Read Analog Inputs
-
-  TxData[2] = (uint8_t)(pos>>8&0xFF);
-  TxData[3] = (uint8_t)(pos&0xFF);
-
-  TxData[4] = (uint8_t)(numRegisters>>8&0xFF);  // Number of registers to read HIGH
-  TxData[5] = (uint8_t)(numRegisters&0xFF);  // Number of registers to read LOW
-
-  uint16_t crc = crc16(TxData, 6);
-  TxData[6] = (uint8_t)(crc&0xFF);   // CRC LOW
-  TxData[7] = (uint8_t)((crc>>8)&0xFF);  // CRC HIGH
-
-  sendData(TxData, 8);
-  HAL_UARTEx_ReceiveToIdle_IT(&huart3, RxData, 5 + numRegisters * 2);
+    if (huart->Instance == USART3 && esperando)
+        rx_error = true;   /* ruido, error de trama o desborde */
 }

@@ -30,6 +30,10 @@ void plc_openplc_logic(void);
 /* Espera hasta el inicio del proximo ciclo segun el INTERVAL de la TASK. */
 void plc_openplc_wait_cycle(void);
 
+/* Tarea que se ejecuta mientras se espera el proximo ciclo (por defecto vacia).
+ * Se puede redefinir en cualquier archivo .c. */
+void plc_tarea_en_espera(void);
+
 /* Diagnostico */
 extern volatile uint32_t plc_ciclos;          /* ciclos ejecutados */
 extern volatile uint32_t plc_ciclos_excedidos; /* ciclos que tardaron mas que el periodo */
