@@ -9,8 +9,15 @@
 #include "mbus_funcs.h"
 
 /* ---- HAL falso ---------------------------------------------------------- */
-USART_TypeDef fake_usart3;
+USART_TypeDef fake_usart1, fake_usart3;
 GPIO_TypeDef fake_gpioa;
+
+/* El Modbus esclavo no participa en este test */
+#include "mbus_esclavo.h"
+bool mbs_es_su_uart(const void *huart) { (void)huart; return false; }
+bool mbs_usa_rs485(void) { return false; }
+void mbs_rx_evento(uint16_t largo) { (void)largo; }
+void mbs_rx_error(void) {}
 UART_HandleTypeDef huart3 = { USART3, { 115200 } };
 
 static uint32_t reloj = 1000;
@@ -75,6 +82,7 @@ static void cb(const mb_respuesta_t *r) { (void)r; llamadas_cb++; }
 int main(void)
 {
     mb_set_callback(cb);
+    mb_reintentos = 0;   /* las pruebas 1..11 son sin reintentos; la 12 los prueba */
 
     printf("1) CRC de la tabla contra calculo bit a bit\n");
     srand(1);
@@ -163,6 +171,34 @@ int main(void)
     CHECK(writeSingleRegister(0, 1, 99) == MB_OK && !mb_ocupado(), "broadcast no espera respuesta");
     CHECK(readHoldingRegisters(1, 0, 200) == MB_ERR_PARAM, "mas de 125 registros");
     CHECK(readCoils(0, 0, 1) == MB_ERR_PARAM, "lectura a broadcast");
+
+    printf("12) Reintentos\n");
+    mb_reintentos = 2;
+    uint32_t reint0 = mbEstadisticas.reintentos, pet0 = mbEstadisticas.peticiones;
+    readHoldingRegisters(1, 0, 1);
+    uint8_t trama_enviada[8]; memcpy(trama_enviada, tx, 8);
+    uint8_t mala[8] = { 0x01, 0x03, 0x02, 0x00, 0x07 };
+    con_crc(mala, 5); mala[6] ^= 0xFF;            /* primera respuesta con CRC malo */
+    llega(mala, 7);
+    mb_procesar();
+    CHECK(mb_ocupado() && mbEstadisticas.reintentos == reint0 + 1, "CRC malo -> reenvia");
+    CHECK(memcmp(tx, trama_enviada, 8) == 0, "reenvia la misma trama");
+    vueltas = 0;                                   /* segunda: no contesta */
+    while (mb_ocupado() && mbEstadisticas.reintentos == reint0 + 1 && vueltas < 10000) { mb_procesar(); vueltas++; }
+    CHECK(mb_ocupado() && mbEstadisticas.reintentos == reint0 + 2, "timeout -> reenvia otra vez");
+    uint8_t buena[8] = { 0x01, 0x03, 0x02, 0x00, 0x07 };
+    llega(buena, con_crc(buena, 5));               /* tercera: bien */
+    mb_procesar();
+    CHECK(mb_estado() == MB_OK && mbRespuesta.registros[0] == 7, "al tercer intento: OK");
+    CHECK(mbEstadisticas.peticiones == pet0 + 1, "cuenta como una sola peticion");
+    readHoldingRegisters(1, 500, 1);
+    llega(ex, con_crc(ex, 3));
+    mb_procesar();
+    CHECK(mb_estado() == MB_ERR_EXCEPCION && !mb_ocupado(), "las excepciones no se reintentan");
+    readHoldingRegisters(9, 0, 1);
+    vueltas = 0;
+    while (mb_ocupado() && vueltas < 100000) { mb_procesar(); vueltas++; }
+    CHECK(mb_estado() == MB_ERR_TIMEOUT && vueltas >= 250, "sin respuesta: 3 intentos y timeout");
 
     printf("\nEstadisticas: peticiones=%u ok=%u timeouts=%u crc=%u excepciones=%u trama=%u\n",
            (unsigned)mbEstadisticas.peticiones, (unsigned)mbEstadisticas.ok,

@@ -10,7 +10,10 @@
  *   2. mb_procesar() (llamada seguido, por ejemplo en cada ciclo) detecta la
  *      respuesta, verifica el CRC y la longitud, y la guarda en mbRespuesta.
  *      Si el esclavo no contesta en mb_timeout_ms, la marca como MB_ERR_TIMEOUT.
- *   3. Cuando termina (bien o mal) se llama al callback, si se registro uno.
+ *   3. Si no hubo respuesta, llego con CRC incorrecto o mal formada, la
+ *      peticion se reenvia hasta mb_reintentos veces (2 por defecto).
+ *      Las excepciones del esclavo no se reintentan.
+ *   4. Cuando termina (bien o mal) se llama al callback, si se registro uno.
  *
  * Para usarlo en forma bloqueante (pruebas, inicializacion): mb_esperar().
  */
@@ -38,11 +41,14 @@ typedef struct {
     uint32_t excepciones;
     uint32_t errores_trama;
     uint32_t errores_tx;
+    uint32_t reintentos;
 } mb_estadisticas_t;
 extern mb_estadisticas_t mbEstadisticas;
 
 /* Tiempo maximo de espera de la respuesta, en ms (por defecto 100) */
 extern uint32_t mb_timeout_ms;
+/* Reenvios automaticos ante timeout, CRC o trama invalida (por defecto 2) */
+extern uint8_t mb_reintentos;
 
 typedef void (*mb_callback_t)(const mb_respuesta_t *resp);
 

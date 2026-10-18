@@ -57,6 +57,7 @@
 /* External variables --------------------------------------------------------*/
 extern SPI_HandleTypeDef hspi1;
 extern UART_HandleTypeDef huart3;
+extern UART_HandleTypeDef huart1;
 /* USER CODE BEGIN EV */
 
 /* USER CODE END EV */
@@ -225,6 +226,14 @@ void USART3_IRQHandler(void)
   /* USER CODE BEGIN USART3_IRQn 1 */
 
   /* USER CODE END USART3_IRQn 1 */
+}
+
+/**
+  * @brief USART1 (USB / Modbus esclavo) global interrupt.
+  */
+void USART1_IRQHandler(void)
+{
+  HAL_UART_IRQHandler(&huart1);
 }
 
 /* USER CODE BEGIN 1 */

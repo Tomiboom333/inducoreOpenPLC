@@ -8,6 +8,7 @@
  */
 
 #include "mbus_funcs.h"
+#include "mbus_esclavo.h"
 #include "modbus_crc.h"
 
 uint8_t RxData[MB_MAX_TRAMA];
@@ -18,6 +19,7 @@ volatile uint8_t uart_rx_flag = 0;
 mb_respuesta_t    mbRespuesta;   /* arranca en cero: estado = MB_SIN_PETICION */
 mb_estadisticas_t mbEstadisticas;
 uint32_t          mb_timeout_ms = 100;
+uint8_t           mb_reintentos = 2;
 
 static mb_peticion_t     pet_actual;
 static volatile bool     esperando = false;
@@ -27,6 +29,8 @@ static volatile uint16_t rx_largo = 0;
 static uint32_t          inicio_ms = 0;
 static uint32_t          fin_ms = 0;
 static mb_callback_t     callback = 0;
+static uint16_t          largo_actual = 0;   /* trama actual con CRC, para reenviar */
+static uint8_t           reintentos_restantes = 0;
 
 /* ------------------------------------------------------------------------ */
 
@@ -62,12 +66,10 @@ static void finalizar(mb_estado_t estado)
     mbRespuesta.estado   = estado;
     mbRespuesta.tiempo_ms = fin_ms;
 
+    /* timeouts, CRC y trama se cuentan en falla_comunicacion() (cada intento) */
     switch (estado) {
     case MB_OK:            mbEstadisticas.ok++;            break;
-    case MB_ERR_TIMEOUT:   mbEstadisticas.timeouts++;      break;
-    case MB_ERR_CRC:       mbEstadisticas.errores_crc++;   break;
     case MB_ERR_EXCEPCION: mbEstadisticas.excepciones++;   break;
-    case MB_ERR_TRAMA:     mbEstadisticas.errores_trama++; break;
     case MB_ERR_TX:        mbEstadisticas.errores_tx++;    break;
     default: break;
     }
@@ -76,36 +78,25 @@ static void finalizar(mb_estado_t estado)
         callback(&mbRespuesta);
 }
 
-/* Agrega el CRC, envia y deja la recepcion armada */
-static mb_estado_t iniciar_peticion(const mb_peticion_t *pet, uint16_t largo)
+/* Envia la trama que esta en TxData y deja la recepcion armada */
+static mb_estado_t enviar_actual(void)
 {
-    if (esperando)
-        return MB_ERR_OCUPADO;
-
     /* Silencio entre tramas: al menos ~1 ms desde la respuesta anterior */
     while ((HAL_GetTick() - fin_ms) < 2U) {
     }
-
-    uint16_t crc = crc16(TxData, largo);
-    TxData[largo]     = (uint8_t)(crc & 0xFF);         /* CRC bajo */
-    TxData[largo + 1] = (uint8_t)((crc >> 8) & 0xFF);  /* CRC alto */
-    largo += 2;
-
-    pet_actual = *pet;
-    mbEstadisticas.peticiones++;
 
     HAL_UART_AbortReceive(&huart3);
     rx_listo = false;
     rx_error = false;
     rx_largo = 0;
 
-    if (!sendData(TxData, largo)) {
+    if (!sendData(TxData, largo_actual)) {
         finalizar(MB_ERR_TX);
         return MB_ERR_TX;
     }
 
     /* Broadcast (esclavo 0): no hay respuesta */
-    if (pet->esclavo == 0) {
+    if (pet_actual.esclavo == 0) {
         finalizar(MB_OK);
         return MB_OK;
     }
@@ -119,6 +110,46 @@ static mb_estado_t iniciar_peticion(const mb_peticion_t *pet, uint16_t largo)
         return MB_ERR_TX;
     }
     return MB_PENDIENTE;
+}
+
+/* Agrega el CRC y envia */
+static mb_estado_t iniciar_peticion(const mb_peticion_t *pet, uint16_t largo)
+{
+    if (esperando)
+        return MB_ERR_OCUPADO;
+    if (mbs_usa_rs485())
+        return MB_ERR_PUERTO;
+
+    uint16_t crc = crc16(TxData, largo);
+    TxData[largo]     = (uint8_t)(crc & 0xFF);         /* CRC bajo */
+    TxData[largo + 1] = (uint8_t)((crc >> 8) & 0xFF);  /* CRC alto */
+    largo_actual = (uint16_t)(largo + 2);
+
+    pet_actual = *pet;
+    reintentos_restantes = mb_reintentos;
+    mbEstadisticas.peticiones++;
+
+    return enviar_actual();
+}
+
+/* Ante una falla de comunicacion (timeout, CRC o trama invalida) la cuenta
+ * y reenvia la peticion si quedan reintentos; si no, la da por terminada. */
+static void falla_comunicacion(mb_estado_t e)
+{
+    switch (e) {
+    case MB_ERR_TIMEOUT: mbEstadisticas.timeouts++;      break;
+    case MB_ERR_CRC:     mbEstadisticas.errores_crc++;   break;
+    default:             mbEstadisticas.errores_trama++; break;
+    }
+    if (reintentos_restantes > 0) {
+        reintentos_restantes--;
+        mbEstadisticas.reintentos++;
+        esperando = false;
+        fin_ms = HAL_GetTick();
+        enviar_actual();
+    } else {
+        finalizar(e);
+    }
 }
 
 static void cabecera(uint8_t esclavo, uint8_t funcion, uint16_t pos, uint16_t n)
@@ -136,6 +167,8 @@ static mb_estado_t lectura(uint16_t esclavo, uint8_t funcion, uint16_t pos,
 {
     if (esclavo == 0 || esclavo > 247 || cantidad == 0 || cantidad > maximo)
         return MB_ERR_PARAM;
+    if (esperando)
+        return MB_ERR_OCUPADO;
     mb_peticion_t p = { (uint8_t)esclavo, funcion, pos, cantidad, 0 };
     cabecera((uint8_t)esclavo, funcion, pos, cantidad);
     return iniciar_peticion(&p, 6);
@@ -230,13 +263,18 @@ void mb_procesar(void)
         mb_estado_t e = mb_interpretar(&pet_actual, RxData, largo, &mbRespuesta);
         memcpy(Data, RxData, largo);
         uart_rx_flag = 1;
-        finalizar(e);
+        if (e == MB_ERR_CRC || e == MB_ERR_TRAMA)
+            falla_comunicacion(e);
+        else
+            finalizar(e);
     } else if (rx_error) {
+        /* ruido, error de trama o desborde en la UART */
         HAL_UART_AbortReceive(&huart3);
-        finalizar(MB_ERR_TRAMA);
+        mbRespuesta.largo_trama = 0;
+        falla_comunicacion(MB_ERR_TRAMA);
     } else if ((HAL_GetTick() - inicio_ms) >= mb_timeout_ms) {
         HAL_UART_AbortReceive(&huart3);
-        finalizar(MB_ERR_TIMEOUT);
+        falla_comunicacion(MB_ERR_TIMEOUT);
     }
 }
 
@@ -266,6 +304,10 @@ void mb_set_callback(mb_callback_t cb)
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
+    if (mbs_es_su_uart(huart)) {
+        mbs_rx_evento(Size);
+        return;
+    }
     if (huart->Instance != USART3 || !esperando)
         return;
     if (Size == 0) {
@@ -279,6 +321,10 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
+    if (mbs_es_su_uart(huart)) {
+        mbs_rx_error();
+        return;
+    }
     if (huart->Instance == USART3 && esperando)
         rx_error = true;   /* ruido, error de trama o desborde */
 }

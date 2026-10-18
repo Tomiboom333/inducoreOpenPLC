@@ -87,6 +87,11 @@ static void copiar_entradas(void)
             if (m < N_MODULOS)
                 *(INT *)v->ptr = (INT)estAct.modIa[m][c];
             break;
+        case LOC_MW:
+            /* %MW: memoria compartida con el Modbus esclavo (holding 1024+n) */
+            if (v->dir[0] < PLC_N_MW)
+                *(INT *)v->ptr = (INT)plc_mw[v->dir[0]];
+            break;
         default:
             break;
         }
@@ -106,17 +111,24 @@ static void copiar_salidas(void)
         case LOC_QW: {
             INT val = *(INT *)v->ptr;
             m = v->dir[0] / N_ANA; c = v->dir[0] % N_ANA;
-            if (val < 0)   val = 0;
-            if (val > 255) val = 255;
+            if (val < 0)       val = 0;
+            if (val > ANA_MAX) val = ANA_MAX;
             if (m < N_MODULOS)
-                estAct.modOa[m][c] = (uint8_t)val;
+                estAct.modOa[m][c] = (uint16_t)val;
             break;
         }
+        case LOC_MW:
+            if (v->dir[0] < PLC_N_MW)
+                plc_mw[v->dir[0]] = (uint16_t)(*(INT *)v->ptr);
+            break;
         default:
             break;
         }
     }
 }
+
+/* Memoria %MW compartida con el Modbus esclavo */
+uint16_t plc_mw[PLC_N_MW];
 
 /* ---- Ciclo -------------------------------------------------------------- */
 
@@ -160,6 +172,7 @@ void plc_openplc_wait_cycle(void)
     } else {
         while ((int32_t)(HAL_GetTick() - proximo_ciclo) < 0) {
             plc_tarea_en_espera();
+            induWatchdogRefresh();
         }
     }
     proximo_ciclo += plc_periodo_ms;

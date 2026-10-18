@@ -5,6 +5,10 @@ Requiere gcc (en Windows: MinGW-w64 o MSYS2).
 
     python test_pc/correr_test.py
 
+- test_protocolo: tramas del backplane (induproto.h): CRC-8, 12 bits, rechazo de errores.
+- test_backplane: induSPI.c con modulos de E/S simulados: deteccion, lectura,
+  escritura con ACK, desconexion, reconexion y modulos nuevos.
+- test_esclavo: Modbus esclavo y su mapa de registros.
 - test_ejemplo: programa de ejemplo (programas/ejemplo.st) + openplc_glue.c.
   Valido para el ejemplo; si cambias el programa generado, adapta los chequeos.
 - test_modbus: maestro Modbus RTU (envio, CRC, respuestas, errores y timeout).
@@ -23,8 +27,11 @@ LIB = RAIZ / "src" / "OpenPLC" / "lib"
 NO_COPIAR = {"main.h", "stm32f1xx_hal_conf.h", "stm32f1xx_it.h"}
 
 TESTS = {
+    "test_protocolo": [],
+    "test_backplane": [SRC / "induSPI.c"],
     "test_ejemplo": [SRC / "openplc_glue.c", GEN / "Config0.c", GEN / "Res0.c"],
     "test_modbus": [SRC / "mbus_funcs.c", SRC / "mbus_parser.c", SRC / "modbus_crc.c"],
+    "test_esclavo": [SRC / "mbus_esclavo.c", SRC / "mbus_mapa.c", SRC / "mbus_parser.c", SRC / "modbus_crc.c"],
 }
 
 fallas = 0

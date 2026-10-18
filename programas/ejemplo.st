@@ -4,9 +4,10 @@
 
    Mapa de direcciones (ver README):
      %IX<m>.<e>  entrada digital e (0..7) del modulo de entradas m (0..4)
-     %IW<n>      entrada analogica: modulo n/2, canal n%2   (0..255)
+     %IW<n>      entrada analogica: modulo n/2, canal n%2   (0..4095)
      %QX<m>.<s>  salida digital s (0..7) del modulo de salidas m (0..4)
-     %QW<n>      salida analogica: modulo n/2, canal n%2    (0..255)  *)
+     %QW<n>      salida analogica: modulo n/2, canal n%2    (0..4095)
+     %MW<n>      memoria compartida con Modbus (holding 1024+n)       *)
 
 PROGRAM prueba
   VAR
@@ -16,6 +17,7 @@ PROGRAM prueba
     sal3   AT %QX0.2 : BOOL;   (* Salida 3 del modulo de salidas 1 *)
     anout1 AT %QW0   : INT;    (* Analogica 1 del modulo de salidas 1 *)
     anout2 AT %QW1   : INT;    (* Analogica 2 del modulo de salidas 1 *)
+    ciclos AT %MW0   : INT;    (* Contador visible por Modbus (holding 1024) *)
   END_VAR
   VAR
     t1 : TON;
@@ -23,8 +25,8 @@ PROGRAM prueba
     parpadeo : BOOL;
   END_VAR
 
-  (* Igual que algo(): salida 3 activa si la analogica supera la mitad *)
-  sal3 := an1 >= 128;
+  (* Salida 3 activa si la analogica supera la mitad de la escala *)
+  sal3 := an1 >= 2048;
 
   (* Parpadeo de 0,5 s encendido / 0,5 s apagado *)
   t1(IN := NOT t2.Q, PT := T#500ms);
@@ -34,8 +36,11 @@ PROGRAM prueba
   (* Salida 1 parpadea, o queda fija si la entrada 1 esta activa *)
   sal1 := parpadeo OR ent1;
 
-  anout1 := 255;
-  anout2 := 127;
+  (* Cuenta los ciclos; se puede leer o reiniciar desde un SCADA *)
+  ciclos := ciclos + 1;
+
+  anout1 := 4095;   (* 100 % *)
+  anout2 := 2047;   (* 50 % *)
 END_PROGRAM
 
 CONFIGURATION Config0

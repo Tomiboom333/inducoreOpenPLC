@@ -2,6 +2,7 @@
 #include "induSPI.h"
 #include "openplc_glue.h"
 #include "mbus_funcs.h"
+#include "mbus_esclavo.h"
 
 /*
  * Modulo CPU de InduCore ejecutando un programa IEC 61131-3 (Ladder, ST, FBD...)
@@ -12,6 +13,10 @@
  *
  * Cada ciclo: espera el periodo de la TASK (atendiendo Modbus mientras tanto)
  * -> lee entradas por SPI -> ejecuta el programa IEC -> escribe salidas por SPI.
+ *
+ * Modbus: el PLC es esclavo por USB (USART1) para SCADA/HMI, y maestro por
+ * RS-485 (USART3). Ver mbus_esclavo.h para el mapa de registros y para usar
+ * el RS-485 como esclavo.
  */
 
 /* Poner en 1 para probar el maestro Modbus con un esclavo real */
@@ -20,7 +25,8 @@
 /* Mientras el CPU espera el proximo ciclo, se atienden las respuestas Modbus */
 void plc_tarea_en_espera(void)
 {
-  mb_procesar();
+  mb_procesar();    /* respuestas del maestro */
+  mbs_procesar();   /* peticiones al esclavo */
 }
 
 #if EJEMPLO_MODBUS
@@ -57,6 +63,7 @@ int main(void)
 {
   induInit();          /* reloj, GPIO, SPI, UART y deteccion de modulos */
   plc_openplc_init();  /* inicializa el programa IEC y el periodo de ciclo */
+  mbs_init();          /* Modbus esclavo */
 
 #if EJEMPLO_MODBUS
   mb_set_callback(respuesta_modbus);
@@ -66,6 +73,7 @@ int main(void)
     plc_openplc_wait_cycle();
     plc_run_cycle(plc_openplc_logic);
     mb_procesar();
+    mbs_procesar();
 #if EJEMPLO_MODBUS
     ejemplo_modbus();
 #endif

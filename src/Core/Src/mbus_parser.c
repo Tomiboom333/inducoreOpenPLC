@@ -120,6 +120,7 @@ const char *mb_estado_texto(mb_estado_t e)
     case MB_ERR_OCUPADO:   return "OCUPADO";
     case MB_ERR_PARAM:     return "PARAMETRO INVALIDO";
     case MB_ERR_TX:        return "ERROR TX";
+    case MB_ERR_PUERTO:    return "PUERTO EN MODO ESCLAVO";
     case MB_SIN_PETICION:  return "SIN PETICION";
     }
     return "?";

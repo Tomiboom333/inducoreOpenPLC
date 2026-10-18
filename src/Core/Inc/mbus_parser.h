@@ -34,7 +34,8 @@ typedef enum {
     MB_ERR_TRAMA,       /* respuesta mal formada, de otro esclavo o de otra funcion */
     MB_ERR_OCUPADO,     /* ya hay una peticion en curso */
     MB_ERR_PARAM,       /* parametros invalidos (cantidad fuera de rango, etc.) */
-    MB_ERR_TX           /* fallo la transmision por la UART */
+    MB_ERR_TX,          /* fallo la transmision por la UART */
+    MB_ERR_PUERTO       /* el RS-485 esta configurado como Modbus esclavo */
 } mb_estado_t;
 
 /* Lo que se le pidio al esclavo (se usa para validar la respuesta) */
