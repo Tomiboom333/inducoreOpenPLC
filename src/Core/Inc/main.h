@@ -57,16 +57,19 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define SPI1_NSS1_Pin GPIO_PIN_0
-#define SPI1_NSS1_GPIO_Port GPIOA
-#define SPI1_NSS2_Pin GPIO_PIN_1
-#define SPI1_NSS2_GPIO_Port GPIOA
-#define SPI1_NSS3_Pin GPIO_PIN_2
-#define SPI1_NSS3_GPIO_Port GPIOA
-#define SPI1_NSS4_Pin GPIO_PIN_3
-#define SPI1_NSS4_GPIO_Port GPIOA
-#define SPI1_NSS5_Pin GPIO_PIN_4
-#define SPI1_NSS5_GPIO_Port GPIOA
+/* Chip select de cada slot, con el nombre de la linea del riel a la que llegan.
+ * El conector esta espejado: el pin PA4 llega a SS0 (slot M1, pegado a la CPU)
+ * y el PA0 a SS4 (ultimo slot). Ver docs/PROTOCOLO.md. */
+#define SPI1_SS0_Pin GPIO_PIN_4        /* slot M1  */
+#define SPI1_SS0_GPIO_Port GPIOA
+#define SPI1_SS1_Pin GPIO_PIN_3        /* slot M2  */
+#define SPI1_SS1_GPIO_Port GPIOA
+#define SPI1_SS2_Pin GPIO_PIN_2        /* slot ME1 */
+#define SPI1_SS2_GPIO_Port GPIOA
+#define SPI1_SS3_Pin GPIO_PIN_1        /* slot ME2 */
+#define SPI1_SS3_GPIO_Port GPIOA
+#define SPI1_SS4_Pin GPIO_PIN_0        /* slot ME3 */
+#define SPI1_SS4_GPIO_Port GPIOA
 #define TX_EN_Pin GPIO_PIN_8
 #define TX_EN_GPIO_Port GPIOA
 

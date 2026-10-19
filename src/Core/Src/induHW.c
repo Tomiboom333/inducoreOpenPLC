@@ -106,17 +106,17 @@ void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, SPI1_NSS1_Pin|SPI1_NSS2_Pin|SPI1_NSS3_Pin|SPI1_NSS4_Pin
-                          |SPI1_NSS5_Pin, GPIO_PIN_SET);//cambiado a set
+  HAL_GPIO_WritePin(GPIOA, SPI1_SS4_Pin|SPI1_SS3_Pin|SPI1_SS2_Pin|SPI1_SS1_Pin
+                          |SPI1_SS0_Pin, GPIO_PIN_SET);//cambiado a set
   HAL_GPIO_WritePin(GPIOA, TX_EN_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : SPI1_NSS1_Pin SPI1_NSS2_Pin SPI1_NSS3_Pin SPI1_NSS4_Pin
-                           SPI1_NSS5_Pin TX_EN_Pin */
-  GPIO_InitStruct.Pin = SPI1_NSS1_Pin|SPI1_NSS2_Pin|SPI1_NSS3_Pin|SPI1_NSS4_Pin
-                          |SPI1_NSS5_Pin|TX_EN_Pin;
+  /*Configure GPIO pins : SPI1_SS4_Pin SPI1_SS3_Pin SPI1_SS2_Pin SPI1_SS1_Pin
+                           SPI1_SS0_Pin TX_EN_Pin */
+  GPIO_InitStruct.Pin = SPI1_SS4_Pin|SPI1_SS3_Pin|SPI1_SS2_Pin|SPI1_SS1_Pin
+                          |SPI1_SS0_Pin|TX_EN_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;

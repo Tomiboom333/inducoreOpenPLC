@@ -36,15 +36,15 @@ typedef struct {
 } esclavo_t;
 static esclavo_t esc[N_MODULOS];
 
-/* slot 0 = primer modulo a la derecha de la CPU = PA4 (NSS5) */
+/* slot 0 = primer modulo a la derecha de la CPU = linea SS0 = PA4 */
 static int slot_de_pin(uint16_t pin)
 {
     switch (pin) {
-    case SPI1_NSS5_Pin: return 0;
-    case SPI1_NSS4_Pin: return 1;
-    case SPI1_NSS3_Pin: return 2;
-    case SPI1_NSS2_Pin: return 3;
-    case SPI1_NSS1_Pin: return 4;
+    case SPI1_SS0_Pin: return 0;
+    case SPI1_SS1_Pin: return 1;
+    case SPI1_SS2_Pin: return 2;
+    case SPI1_SS3_Pin: return 3;
+    case SPI1_SS4_Pin: return 4;
     }
     return -1;
 }

@@ -20,16 +20,16 @@ extern GPIO_TypeDef fake_gpioa;
 
 #define TX_EN_GPIO_Port GPIOA
 #define TX_EN_Pin 0x0100
-#define SPI1_NSS1_GPIO_Port GPIOA
-#define SPI1_NSS1_Pin 0x0001
-#define SPI1_NSS2_GPIO_Port GPIOA
-#define SPI1_NSS2_Pin 0x0002
-#define SPI1_NSS3_GPIO_Port GPIOA
-#define SPI1_NSS3_Pin 0x0004
-#define SPI1_NSS4_GPIO_Port GPIOA
-#define SPI1_NSS4_Pin 0x0008
-#define SPI1_NSS5_GPIO_Port GPIOA
-#define SPI1_NSS5_Pin 0x0010
+#define SPI1_SS4_GPIO_Port GPIOA
+#define SPI1_SS4_Pin 0x1
+#define SPI1_SS3_GPIO_Port GPIOA
+#define SPI1_SS3_Pin 0x2
+#define SPI1_SS2_GPIO_Port GPIOA
+#define SPI1_SS2_Pin 0x4
+#define SPI1_SS1_GPIO_Port GPIOA
+#define SPI1_SS1_Pin 0x8
+#define SPI1_SS0_GPIO_Port GPIOA
+#define SPI1_SS0_Pin 0x10
 
 #define __HAL_RCC_AFIO_CLK_ENABLE()   do {} while (0)
 #define __HAL_AFIO_REMAP_SWJ_NOJTAG() do {} while (0)

@@ -17,16 +17,18 @@ Modulo_OUT). Si se cambia en uno, hay que copiarlo a los otros dos y subir
 
 ### Slots y chip select
 
-Por el espejado del conector, el nombre de los chip select de la CPU está
-invertido respecto del riel. El firmware numera los slots en orden físico:
+Por el espejado del conector, el pin PA4 de la CPU llega a la línea SS0 del
+riel y el PA0 a SS4. En el firmware cada chip select se llama como la línea
+del riel a la que llega (`SPI1_SS0` … `SPI1_SS4`) y los slots se numeran en
+orden físico:
 
 | Slot (firmware) | Posición en el riel | Línea del riel | Pin de la CPU |
 |---|---|---|---|
-| 0 | M1 (primero a la derecha de la CPU) | SS0 | PA4 (`SPI1_NSS5`) |
-| 1 | M2 | SS1 | PA3 (`SPI1_NSS4`) |
-| 2 | ME1 | SS2 | PA2 (`SPI1_NSS3`) |
-| 3 | ME2 | SS3 | PA1 (`SPI1_NSS2`) |
-| 4 | ME3 (último) | SS4 | PA0 (`SPI1_NSS1`) |
+| 0 | M1 (primero a la derecha de la CPU) | SS0 | PA4 (`SPI1_SS0`) |
+| 1 | M2 | SS1 | PA3 (`SPI1_SS1`) |
+| 2 | ME1 | SS2 | PA2 (`SPI1_SS2`) |
+| 3 | ME2 | SS3 | PA1 (`SPI1_SS3`) |
+| 4 | ME3 (último) | SS4 | PA0 (`SPI1_SS4`) |
 
 Los índices `MOD_IN_x` y `MOD_OUT_x` se asignan en ese orden al arrancar:
 `MOD_IN_1` es el primer módulo de entradas a la derecha de la CPU.

@@ -22,14 +22,13 @@ spi_estadisticas_t spiEstadisticas;
 int contModulosIn = 0, contModulosOut = 0;
 
 /* Slot fisico (0 = el primero a la derecha de la CPU) -> chip select.
- * Por el espejado del conector, el SS0 del riel (slot M1) llega al PA4 de
- * la CPU (SPI1_NSS5) y el SS4 (ultimo slot) al PA0 (SPI1_NSS1). */
+ * SPI1_SSn es la linea SSn del riel (ver main.h). */
 static GPIO_TypeDef *const cs_puerto[N_MODULOS] = {
-  SPI1_NSS5_GPIO_Port, SPI1_NSS4_GPIO_Port, SPI1_NSS3_GPIO_Port,
-  SPI1_NSS2_GPIO_Port, SPI1_NSS1_GPIO_Port
+  SPI1_SS0_GPIO_Port, SPI1_SS1_GPIO_Port, SPI1_SS2_GPIO_Port,
+  SPI1_SS3_GPIO_Port, SPI1_SS4_GPIO_Port
 };
 static const uint16_t cs_pin[N_MODULOS] = {
-  SPI1_NSS5_Pin, SPI1_NSS4_Pin, SPI1_NSS3_Pin, SPI1_NSS2_Pin, SPI1_NSS1_Pin
+  SPI1_SS0_Pin, SPI1_SS1_Pin, SPI1_SS2_Pin, SPI1_SS3_Pin, SPI1_SS4_Pin
 };
 
 /* Slot de cada indice de modulo (-1 = no asignado) */
