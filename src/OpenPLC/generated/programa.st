@@ -4,7 +4,7 @@
 
    Mapa de direcciones (ver README):
      %IX<m>.<e>  entrada digital e (0..7) del modulo de entradas m (0..4)
-     %IW<n>      entrada analogica: modulo n/2, canal n%2   (0..4095)
+     %IW<n>      entrada analogica: modulo n/2, canal n%2   (0..255)
      %QX<m>.<s>  salida digital s (0..7) del modulo de salidas m (0..4)
      %QW<n>      salida analogica: modulo n/2, canal n%2    (0..255)
      %MW<n>      memoria compartida con Modbus (holding 1024+n)       *)
@@ -26,7 +26,7 @@ PROGRAM prueba
   END_VAR
 
   (* Salida 3 activa si la analogica supera la mitad de la escala *)
-  sal3 := an1 >= 2048;
+  sal3 := an1 >= 128;
 
   (* Parpadeo de 0,5 s encendido / 0,5 s apagado *)
   t1(IN := NOT t2.Q, PT := T#500ms);

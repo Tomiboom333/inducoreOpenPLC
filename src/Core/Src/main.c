@@ -68,7 +68,7 @@ static void ejemplo_modbus(void)
  * Con todas las entradas en reposo, las salidas digitales se encienden de a
  * una cada 500 ms. Al activar una entrada, se enciende solo su salida.
  * AO0 copia InAn1 y AO1 hace una rampa de 0 a 100 % en 5 s.
- * Las salidas analogicas van de 0 a 255 (ANA_MAX); las entradas, de 0 a 4095.
+ * Las analogicas van de 0 a 255, tanto entradas como salidas.
  */
 #define PRUEBA_PLACAS 1
 
@@ -125,10 +125,10 @@ static void prueba_logica(void)
     digWrite(MOD_OUT_1, prueba_sal[i], estado);
   }
 
-  /* Analogicas: AO0 copia InAn1 (de 12 a 8 bits); AO1 sube de 0 a 255 en 5 s */
+  /* Analogicas: AO0 copia InAn1; AO1 sube de 0 a 255 en 5 s */
   prueba_an1 = anRead(MOD_IN_1, AN_1);
   prueba_an2 = anRead(MOD_IN_1, AN_2);
-  anWrite(MOD_OUT_1, AN_1, (uint16_t)(prueba_an1 >> 4));
+  anWrite(MOD_OUT_1, AN_1, prueba_an1);
   anWrite(MOD_OUT_1, AN_2,
           (uint16_t)(((ahora % PRUEBA_RAMPA_MS) * ANA_MAX) / (PRUEBA_RAMPA_MS - 1U)));
 

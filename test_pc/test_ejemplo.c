@@ -18,10 +18,10 @@ int main(void){
   printf("periodo = %u ms\n", (unsigned)plc_periodo_ms);
   CHECK(plc_periodo_ms==20,"periodo 20 ms");
   /* analogica alta -> %QX0.2 (SAL_3 = bit 1) */
-  estAct.modIa[0][0]=3000; plc_openplc_logic(); fake_ms+=20;
-  CHECK(estAct.modOd[0][SAL_3]==1,"sal3 con an1=3000 (12 bits)");
-  estAct.modIa[0][0]=1000; plc_openplc_logic(); fake_ms+=20;
-  CHECK(estAct.modOd[0][SAL_3]==0,"sal3 con an1=1000");
+  estAct.modIa[0][0]=200; plc_openplc_logic(); fake_ms+=20;
+  CHECK(estAct.modOd[0][SAL_3]==1,"sal3 con an1=200");
+  estAct.modIa[0][0]=50; plc_openplc_logic(); fake_ms+=20;
+  CHECK(estAct.modOd[0][SAL_3]==0,"sal3 con an1=50");
   CHECK(estAct.modOa[0][0]==255 && estAct.modOa[0][1]==127,"salidas analogicas de 0 a 255");
   /* parpadeo: contar cambios de %QX0.0 (SAL_1 = bit 3) en 3 s */
   int cambios=0; bool prev=estAct.modOd[0][SAL_1];

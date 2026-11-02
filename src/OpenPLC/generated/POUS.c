@@ -22,7 +22,7 @@ void PRUEBA_init__(PRUEBA *data__, BOOL retain) {
 void PRUEBA_body__(PRUEBA *data__) {
   // Initialise TEMP variables
 
-  __SET_LOCATED(data__->,SAL3,,(__GET_LOCATED(data__->AN1,) >= 2048));
+  __SET_LOCATED(data__->,SAL3,,(__GET_LOCATED(data__->AN1,) >= 128));
   __SET_VAR(data__->T1.,IN,,!(__GET_VAR(data__->T2.Q,)));
   __SET_VAR(data__->T1.,PT,,__time_to_timespec(1, 500, 0, 0, 0, 0));
   TON_body__(&data__->T1);

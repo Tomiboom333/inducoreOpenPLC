@@ -15,7 +15,7 @@
  *
  *   Coils            (01, 05, 0F)  0..39      %QX m.s  -> 8*m + s   (salidas digitales)
  *   Discrete inputs  (02)          0..39      %IX m.e  -> 8*m + e   (entradas digitales)
- *   Input registers  (04)          0..9       %IW n                  (entradas analogicas 0..4095)
+ *   Input registers  (04)          0..9       %IW n                  (entradas analogicas 0..255)
  *                                  100..111   diagnostico (ver mbus_mapa.c)
  *   Holding registers(03, 06, 10)  0..9       %QW n                  (salidas analogicas 0..255)
  *                                  1024..1087 %MW 0..63              (memoria del programa)

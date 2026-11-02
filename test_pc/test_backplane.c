@@ -112,13 +112,13 @@ int main(void)
     CHECK(slots[3].indice == MOD_IN_2 && slots[4].indice == MOD_OUT_2, "slot 3 -> MOD_IN_2, slot 4 -> MOD_OUT_2");
     CHECK(slots[2].tipo == SLOT_VACIO, "slot 2 vacio");
 
-    printf("2) Lectura de entradas (12 bits)\n");
+    printf("2) Lectura de entradas (12 bits en la trama, 0..255 en la logica)\n");
     esc[0].entradas = (proto_datos_t){ 0x81, { 100, 4000 } };
     esc[3].entradas = (proto_datos_t){ 0x02, { 4095, 0 } };
     plc_read_inputs();
     CHECK(digRead(MOD_IN_1, ENT_1) && digRead(MOD_IN_1, ENT_8) && !digRead(MOD_IN_1, ENT_2), "digitales MOD_IN_1");
-    CHECK(anRead(MOD_IN_1, AN_1) == 100 && anRead(MOD_IN_1, AN_2) == 4000, "analogicas MOD_IN_1");
-    CHECK(digRead(MOD_IN_2, ENT_2) && anRead(MOD_IN_2, AN_1) == 4095, "MOD_IN_2");
+    CHECK(anRead(MOD_IN_1, AN_1) == 6 && anRead(MOD_IN_1, AN_2) == 250, "analogicas MOD_IN_1");
+    CHECK(digRead(MOD_IN_2, ENT_2) && anRead(MOD_IN_2, AN_1) == 255, "MOD_IN_2");
 
     printf("3) Escritura de salidas con confirmacion\n");
     digWrite(MOD_OUT_2, SAL_1, HIGH);
@@ -133,10 +133,10 @@ int main(void)
     esc[0].entradas.ana[0] = 999;
     esc[0].corromper = true;
     plc_read_inputs();
-    CHECK(anRead(MOD_IN_1, AN_1) == 100 && spiEstadisticas.lecturasError == 1, "lectura rechazada por CRC");
+    CHECK(anRead(MOD_IN_1, AN_1) == 6 && spiEstadisticas.lecturasError == 1, "lectura rechazada por CRC");
     CHECK(modEntradasOk(MOD_IN_1), "una falla sola no lo desconecta");
     plc_read_inputs();
-    CHECK(anRead(MOD_IN_1, AN_1) == 999, "la siguiente lectura buena se toma");
+    CHECK(anRead(MOD_IN_1, AN_1) == 62, "la siguiente lectura buena se toma");
 
     printf("5) Modulo de entradas desconectado\n");
     esc[3].conectado = false;
@@ -147,7 +147,7 @@ int main(void)
 
     printf("6) Reconexion automatica\n");
     esc[3].conectado = true;
-    esc[3].entradas = (proto_datos_t){ 0x10, { 1, 2 } };
+    esc[3].entradas = (proto_datos_t){ 0x10, { 1, 160 } };
     reloj += 500;
     plc_run_cycle(sin_logica);
     CHECK(!modEntradasOk(MOD_IN_2), "antes de SPI_REDETECCION_MS sigue offline");
@@ -155,7 +155,7 @@ int main(void)
     plc_run_cycle(sin_logica);
     CHECK(modEntradasOk(MOD_IN_2) && spiEstadisticas.reconexiones == 1, "vuelve a responder");
     plc_run_cycle(sin_logica);
-    CHECK(digRead(MOD_IN_2, ENT_5) && anRead(MOD_IN_2, AN_2) == 2, "y se leen sus entradas");
+    CHECK(digRead(MOD_IN_2, ENT_5) && anRead(MOD_IN_2, AN_2) == 10, "y se leen sus entradas");
 
     printf("7) Modulo nuevo en un slot vacio\n");
     conectar(2, SLOT_SALIDAS);

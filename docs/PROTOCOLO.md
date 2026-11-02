@@ -48,9 +48,10 @@ medias y queda listo para la próxima trama, así un error nunca se arrastra.
 
 ## Tramas
 
-Los valores analógicos viajan en 12 bits (0–4095), byte alto primero. Las
-entradas usan todo el rango; las salidas van de **0 a 255**, que es lo que
-manda la CPU (`ANA_MAX`) y espera el PWM de Modulo_OUT.
+Los valores analógicos viajan en 12 bits (0–4095), byte alto primero. El módulo
+de entradas manda sus 12 bits y la CPU los convierte a 0–255 al recibirlos (`>> 4`).
+Las salidas van de **0 a 255**, que es lo que manda la CPU (`ANA_MAX`) y espera
+el PWM de Modulo_OUT.
 El **CRC-8** (polinomio 0x07, valor inicial 0x00, sin reflexión: CRC-8/SMBUS)
 se calcula sobre el comando y todos los bytes de datos.
 

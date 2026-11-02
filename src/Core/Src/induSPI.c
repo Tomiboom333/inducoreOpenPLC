@@ -197,8 +197,8 @@ void plc_read_inputs(void)
         proto_leer_datos(PROTO_CMD_LEER, rx, &d)) {
       for (int i = 0; i < 8; i++)
         estAct.modId[idx][i] = (d.dig >> i) & 0x1;
-      estAct.modIa[idx][AN_1] = d.ana[0];
-      estAct.modIa[idx][AN_2] = d.ana[1];
+      estAct.modIa[idx][AN_1] = d.ana[0] >> ANA_ENT_SHIFT;
+      estAct.modIa[idx][AN_2] = d.ana[1] >> ANA_ENT_SHIFT;
       transaccion_ok(s);
       spiEstadisticas.lecturasOk++;
     } else {

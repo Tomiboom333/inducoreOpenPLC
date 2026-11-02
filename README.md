@@ -39,7 +39,7 @@ OpenPLC Editor  ──►  programa.st  ──►  tools/generar_programa.py  �
 | Dirección IEC | Tipo | Hardware | Variable en `estAct` |
 |---|---|---|---|
 | `%IX<m>.<e>` | BOOL | Entrada digital `e` (0–7) del módulo de entradas `m` (0–4) | `modId[m][e]` |
-| `%IW<n>` | INT | Entrada analógica: módulo `n/2`, canal `n%2` (0–4095) | `modIa[n/2][n%2]` |
+| `%IW<n>` | INT | Entrada analógica: módulo `n/2`, canal `n%2` (0–255) | `modIa[n/2][n%2]` |
 | `%QX<m>.<s>` | BOOL | Salida digital `s` (0–7) del módulo de salidas `m` (0–4) | `modOd[m][SAL_(s+1)]` |
 | `%QW<n>` | INT | Salida analógica: módulo `n/2`, canal `n%2` (se recorta a 0–255) | `modOa[n/2][n%2]` |
 | `%MW<n>` | INT | Memoria `n` (0–63), compartida con el Modbus esclavo (holding 1024+`n`) | `plc_mw[n]` |
@@ -58,8 +58,8 @@ Notas:
   entradas y los de salidas. Ver `docs/PROTOCOLO.md`.
 - `%QX<m>.0` corresponde a la salida física 1 respetando el orden de bits de
   `induSPI.h` (`SAL_1` = bit 3, `SAL_2` = bit 2, ...), igual que con `digWrite()`.
-- Las entradas analógicas son de **12 bits** (0–4095) y las salidas analógicas
-  van de **0 a 255**. El canal 0 de cada módulo es
+- Las analógicas, de entrada y de salida, van de **0 a 255**. El módulo de
+  entradas lee 12 bits y la CPU los convierte al recibirlos. El canal 0 de cada módulo es
   `AN_1` (bornera InAn1 / AO0) y el canal 1 es `AN_2` (InAn2 / AO1).
 - Las direcciones fuera de rango (por ejemplo `%IX7.0`) se ignoran.
 - `%MW0`–`%MW63` se pueden leer y escribir desde un SCADA o HMI por Modbus.
@@ -108,7 +108,7 @@ el maestro. Para usar el RS-485 como esclavo, compilar con
 |---|---|---|---|
 | Coils | 01, 05, 0F | 0–39 | `%QX m.s` → `8·m + s` (salidas digitales) |
 | Discrete inputs | 02 | 0–39 | `%IX m.e` → `8·m + e` (entradas digitales) |
-| Input registers | 04 | 0–9 | `%IW n` (entradas analógicas, 0–4095) |
+| Input registers | 04 | 0–9 | `%IW n` (entradas analógicas, 0–255) |
 | | | 100–111 | diagnóstico (abajo) |
 | Holding registers | 03, 06, 10 | 0–9 | `%QW n` (salidas analógicas, 0–255) |
 | | | 1024–1087 | `%MW 0–63` |

@@ -7,7 +7,7 @@
  *
  * Mapa de direcciones IEC 61131-3:
  *   %IX<m>.<e>  -> estAct.modId[m][e]          m = modulo de entradas 0..4, e = 0..7
- *   %IW<n>      -> estAct.modIa[n/2][n%2]      valores 0..4095 (12 bits)
+ *   %IW<n>      -> estAct.modIa[n/2][n%2]      valores 0..255
  *   %QX<m>.<s>  -> estAct.modOd[m][SAL_(s+1)]  m = modulo de salidas 0..4,  s = 0..7
  *   %QW<n>      -> estAct.modOa[n/2][n%2]      se recorta a 0..255
  *   %MW<n>      -> plc_mw[n]                   n = 0..63, compartida con Modbus
