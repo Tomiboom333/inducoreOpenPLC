@@ -4,6 +4,7 @@
  */
 
 #include "mbus_esclavo.h"
+#include "induSPI.h"       /* ANA_MAX */
 #include "mbus_parser.h"   /* crc16, mb_crc_valido */
 #include <string.h>
 
@@ -151,7 +152,7 @@ uint16_t mbs_procesar_trama(uint8_t direccion, const uint8_t *req, uint16_t n, u
         for (uint16_t i = 0; i < cant; i++) {
             uint16_t v = leer16(&req[7 + 2 * i]);
             uint16_t d = (uint16_t)(ini + i);
-            if (d < 1024 && v > 4095)   /* salidas analogicas de 12 bits */
+            if (d < 1024 && v > ANA_MAX)   /* salidas analogicas */
                 return broadcast ? 0 : excepcion(dir, fc, MBS_EXC_VALOR, resp);
         }
         for (uint16_t i = 0; i < cant; i++) {

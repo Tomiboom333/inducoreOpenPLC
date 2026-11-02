@@ -22,7 +22,7 @@ int main(void){
   CHECK(estAct.modOd[0][SAL_3]==1,"sal3 con an1=3000 (12 bits)");
   estAct.modIa[0][0]=1000; plc_openplc_logic(); fake_ms+=20;
   CHECK(estAct.modOd[0][SAL_3]==0,"sal3 con an1=1000");
-  CHECK(estAct.modOa[0][0]==4095 && estAct.modOa[0][1]==2047,"salidas analogicas de 12 bits");
+  CHECK(estAct.modOa[0][0]==255 && estAct.modOa[0][1]==127,"salidas analogicas de 0 a 255");
   /* parpadeo: contar cambios de %QX0.0 (SAL_1 = bit 3) en 3 s */
   int cambios=0; bool prev=estAct.modOd[0][SAL_1];
   for(int i=0;i<150;i++){ plc_openplc_logic(); bool v=estAct.modOd[0][SAL_1]; if(v!=prev){cambios++; printf("t=%4u ms  sal1=%d\n",(unsigned)(i*20),v);} prev=v; }

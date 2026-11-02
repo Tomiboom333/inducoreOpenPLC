@@ -41,7 +41,7 @@ OpenPLC Editor  ──►  programa.st  ──►  tools/generar_programa.py  �
 | `%IX<m>.<e>` | BOOL | Entrada digital `e` (0–7) del módulo de entradas `m` (0–4) | `modId[m][e]` |
 | `%IW<n>` | INT | Entrada analógica: módulo `n/2`, canal `n%2` (0–4095) | `modIa[n/2][n%2]` |
 | `%QX<m>.<s>` | BOOL | Salida digital `s` (0–7) del módulo de salidas `m` (0–4) | `modOd[m][SAL_(s+1)]` |
-| `%QW<n>` | INT | Salida analógica: módulo `n/2`, canal `n%2` (se recorta a 0–4095) | `modOa[n/2][n%2]` |
+| `%QW<n>` | INT | Salida analógica: módulo `n/2`, canal `n%2` (se recorta a 0–255) | `modOa[n/2][n%2]` |
 | `%MW<n>` | INT | Memoria `n` (0–63), compartida con el Modbus esclavo (holding 1024+`n`) | `plc_mw[n]` |
 
 Ejemplos:
@@ -58,7 +58,8 @@ Notas:
   entradas y los de salidas. Ver `docs/PROTOCOLO.md`.
 - `%QX<m>.0` corresponde a la salida física 1 respetando el orden de bits de
   `induSPI.h` (`SAL_1` = bit 3, `SAL_2` = bit 2, ...), igual que con `digWrite()`.
-- Las analógicas son de **12 bits** (0–4095). El canal 0 de cada módulo es
+- Las entradas analógicas son de **12 bits** (0–4095) y las salidas analógicas
+  van de **0 a 255**. El canal 0 de cada módulo es
   `AN_1` (bornera InAn1 / AO0) y el canal 1 es `AN_2` (InAn2 / AO1).
 - Las direcciones fuera de rango (por ejemplo `%IX7.0`) se ignoran.
 - `%MW0`–`%MW63` se pueden leer y escribir desde un SCADA o HMI por Modbus.
@@ -109,7 +110,7 @@ el maestro. Para usar el RS-485 como esclavo, compilar con
 | Discrete inputs | 02 | 0–39 | `%IX m.e` → `8·m + e` (entradas digitales) |
 | Input registers | 04 | 0–9 | `%IW n` (entradas analógicas, 0–4095) |
 | | | 100–111 | diagnóstico (abajo) |
-| Holding registers | 03, 06, 10 | 0–9 | `%QW n` (salidas analógicas, 0–4095) |
+| Holding registers | 03, 06, 10 | 0–9 | `%QW n` (salidas analógicas, 0–255) |
 | | | 1024–1087 | `%MW 0–63` |
 
 Diagnóstico (input registers): 100 versión del protocolo · 101/102 cantidad de
@@ -269,7 +270,7 @@ flashear, conviene verificar:
    enchufarlo (`desconexiones` / `reconexiones`).
 7. Módulo de salidas: con salidas encendidas, desconectar o resetear la CPU;
    en ~0,5 s tienen que apagarse todas.
-8. Salidas analógicas: confirmar que 0 = apagada y 4095 = 100 %. Si quedan
+8. Salidas analógicas: confirmar que 0 = apagada y 255 = 100 %. Si quedan
    invertidas, poner `AO_LOGICA_INVERTIDA 0` en Modulo_OUT.
 9. Entradas analógicas: confirmar que `AN_1` lee la bornera InAn1.
 10. Modbus esclavo: conectarse por USB con un cliente Modbus (por ejemplo

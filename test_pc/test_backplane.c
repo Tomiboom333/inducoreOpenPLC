@@ -122,11 +122,11 @@ int main(void)
 
     printf("3) Escritura de salidas con confirmacion\n");
     digWrite(MOD_OUT_2, SAL_1, HIGH);
-    anWrite(MOD_OUT_1, AN_1, 3000);
-    anWrite(MOD_OUT_1, AN_2, 5000);   /* se recorta a 4095 */
+    anWrite(MOD_OUT_1, AN_1, 200);
+    anWrite(MOD_OUT_1, AN_2, 5000);   /* se recorta a 255 */
     plc_write_outputs();
     CHECK(esc[4].salidas.dig == (1 << SAL_1), "SAL_1 llega como bit 3");
-    CHECK(esc[1].salidas.ana[0] == 3000 && esc[1].salidas.ana[1] == 4095, "analogicas de salida (y recorte)");
+    CHECK(esc[1].salidas.ana[0] == 200 && esc[1].salidas.ana[1] == 255, "analogicas de salida (y recorte)");
     CHECK(spiEstadisticas.escriturasOk == 2, "2 escrituras confirmadas con ACK");
 
     printf("4) Trama corrupta: se conserva la ultima lectura\n");

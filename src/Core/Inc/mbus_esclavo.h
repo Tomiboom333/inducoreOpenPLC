@@ -17,7 +17,7 @@
  *   Discrete inputs  (02)          0..39      %IX m.e  -> 8*m + e   (entradas digitales)
  *   Input registers  (04)          0..9       %IW n                  (entradas analogicas 0..4095)
  *                                  100..111   diagnostico (ver mbus_mapa.c)
- *   Holding registers(03, 06, 10)  0..9       %QW n                  (salidas analogicas 0..4095)
+ *   Holding registers(03, 06, 10)  0..9       %QW n                  (salidas analogicas 0..255)
  *                                  1024..1087 %MW 0..63              (memoria del programa)
  *
  * Ojo: las salidas que escribe el programa del PLC se pisan en cada ciclo.

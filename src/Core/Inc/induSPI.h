@@ -48,7 +48,7 @@
 #define AN_2 1   /* entradas: InAn2 | salidas: AO1 */
 
 #define N_MODULOS 5
-#define ANA_MAX   4095   /* analogicas de 12 bits */
+#define ANA_MAX   255    /* salidas analogicas: 0..255 (100 %) */
 
 #include "stm32f103xb.h"
 #include "stdbool.h"
@@ -62,7 +62,7 @@ typedef struct
     bool modId[N_MODULOS][8];       /* entradas digitales */
     bool modOd[N_MODULOS][8];       /* salidas digitales (indice = bit SAL_x) */
     uint16_t modIa[N_MODULOS][2];   /* entradas analogicas 0..4095 */
-    uint16_t modOa[N_MODULOS][2];   /* salidas analogicas 0..4095 */
+    uint16_t modOa[N_MODULOS][2];   /* salidas analogicas 0..255 */
 } estAct_t;
 
 /* Estado de cada slot del riel */
@@ -115,7 +115,7 @@ void induInit(void);
 
 /* API para la logica del usuario */
 void     digWrite(int modulo, int salida, bool estado);
-void     anWrite(int modulo, int salida, uint16_t valor);   /* 0..4095 */
+void     anWrite(int modulo, int salida, uint16_t valor);   /* 0..255 */
 bool     digRead(int modulo, int entrada);
 uint16_t anRead(int modulo, int entrada);                  /* 0..4095 */
 bool     modEntradasOk(int modulo);   /* true si el modulo de entradas responde */

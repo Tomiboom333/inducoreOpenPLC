@@ -32,8 +32,8 @@ void PRUEBA_body__(PRUEBA *data__) {
   __SET_VAR(data__->,PARPADEO,,__GET_VAR(data__->T1.Q,));
   __SET_LOCATED(data__->,SAL1,,(__GET_VAR(data__->PARPADEO,) || __GET_LOCATED(data__->ENT1,)));
   __SET_LOCATED(data__->,CICLOS,,(__GET_LOCATED(data__->CICLOS,) + 1));
-  __SET_LOCATED(data__->,ANOUT1,,4095);
-  __SET_LOCATED(data__->,ANOUT2,,2047);
+  __SET_LOCATED(data__->,ANOUT1,,255);
+  __SET_LOCATED(data__->,ANOUT2,,127);
 
   goto __end;
 

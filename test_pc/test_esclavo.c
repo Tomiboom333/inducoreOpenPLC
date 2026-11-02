@@ -76,8 +76,8 @@ int main(void)
     printf("4) Holding (03/06/10): salidas analogicas y %%MW\n");
     n = pedir(1, 0x03, 5, 1);
     CHECK(resp_valida(n) && reg(0) == 777, "%QW5");
-    n = pedir(1, 0x06, 0, 2500);
-    CHECK(resp_valida(n) && n == 8 && memcmp(resp, req, 6) == 0 && estAct.modOa[0][0] == 2500, "06 escribe %QW0 y responde eco");
+    n = pedir(1, 0x06, 0, 200);
+    CHECK(resp_valida(n) && n == 8 && memcmp(resp, req, 6) == 0 && estAct.modOa[0][0] == 200, "06 escribe %QW0 y responde eco");
     n = pedir(1, 0x06, 1024 + 3, 0xBEEF);
     CHECK(resp_valida(n) && plc_mw[3] == 0xBEEF, "06 escribe %MW3 (holding 1027)");
     req[0] = 1; req[1] = 0x10; req[2] = 0x04; req[3] = 0x00; req[4] = 0; req[5] = 2; req[6] = 4;
@@ -98,8 +98,8 @@ int main(void)
     CHECK(resp_valida(n) && resp[1] == 0x83 && resp[2] == MBS_EXC_DIRECCION, "direccion inexistente -> 02");
     n = pedir(1, 0x04, 8, 4);
     CHECK(resp[1] == 0x84 && resp[2] == MBS_EXC_DIRECCION, "rango que se pasa del final -> 02");
-    n = pedir(1, 0x06, 0, 5000);
-    CHECK(resp[1] == 0x86 && resp[2] == MBS_EXC_VALOR && estAct.modOa[0][0] == 2500, "valor > 4095 -> 03, sin cambios");
+    n = pedir(1, 0x06, 0, 256);
+    CHECK(resp[1] == 0x86 && resp[2] == MBS_EXC_VALOR && estAct.modOa[0][0] == 200, "valor > 255 -> 03, sin cambios");
     n = pedir(1, 0x05, 0, 0x1234);
     CHECK(resp[1] == 0x85 && resp[2] == MBS_EXC_VALOR, "coil con valor invalido -> 03");
     n = pedir(1, 0x03, 0, 200);

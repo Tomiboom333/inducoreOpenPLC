@@ -6,7 +6,7 @@
      %IX<m>.<e>  entrada digital e (0..7) del modulo de entradas m (0..4)
      %IW<n>      entrada analogica: modulo n/2, canal n%2   (0..4095)
      %QX<m>.<s>  salida digital s (0..7) del modulo de salidas m (0..4)
-     %QW<n>      salida analogica: modulo n/2, canal n%2    (0..4095)
+     %QW<n>      salida analogica: modulo n/2, canal n%2    (0..255)
      %MW<n>      memoria compartida con Modbus (holding 1024+n)       *)
 
 PROGRAM prueba
@@ -39,8 +39,8 @@ PROGRAM prueba
   (* Cuenta los ciclos; se puede leer o reiniciar desde un SCADA *)
   ciclos := ciclos + 1;
 
-  anout1 := 4095;   (* 100 % *)
-  anout2 := 2047;   (* 50 % *)
+  anout1 := 255;   (* 100 % *)
+  anout2 := 127;    (* 50 % *)
 END_PROGRAM
 
 CONFIGURATION Config0
